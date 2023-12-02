@@ -11,19 +11,16 @@
 (function() {
     'use strict';
 
-    // waits for page to load before executing
-    window.addEventListener('load', function() {
-        const couponGridContainer = document.getElementsByClassName('coupon-grid-container')[0];
+    const couponGridContainer = document.getElementsByClassName('coupon-grid-container')[0];
 
-        let clipButton = document.createElement('button');
-        clipButton.addEventListener('click', clipCoupons);
-        clipButton.innerHTML = '<span>Clip All Coupons</span>';
-        clipButton.classList.add('btn');
-        clipButton.classList.add('btn-secondary');
-        clipButton.style.width = '175px';
+    let clipButton = document.createElement('button');
+    clipButton.addEventListener('click', clipCoupons);
+    clipButton.innerHTML = '<span>Clip All Coupons</span>';
+    clipButton.classList.add('btn');
+    clipButton.classList.add('btn-secondary');
+    clipButton.style.width = '175px';
 
-        couponGridContainer.insertBefore(clipButton, couponGridContainer.firstChild);
-    }, false);
+    couponGridContainer.insertBefore(clipButton, couponGridContainer.firstChild);
 })();
 
 async function clipCoupons() {
