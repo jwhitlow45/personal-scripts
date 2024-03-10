@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Safeway Clip All Coupons Button
-// @version      0.1
+// @version      0.2
 // @description  Add convenient button to automatically load and clip all coupons on Safeway's ForU page
 // @author       jwhitlow45
 // @match        https://www.safeway.com/foru/coupons-deals.html*
@@ -32,7 +32,9 @@ async function clipCoupons() {
         window.scrollTo(0, document.body.scrollHeight);
         load_more = document.getElementsByClassName('load-more')[0];
     }
-    let coupons = document.getElementsByClassName("grid-coupon-btn");
-    for (let coupon of coupons) coupon.click();
+    const buttons = document.getElementsByTagName('button')
+    for (const b of buttons) {
+        if (b.innerText == 'Clip Coupon') b.click();
+    }
     console.log('Finished clipping coupons!');
 }
