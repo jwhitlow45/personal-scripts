@@ -34,7 +34,7 @@ async function clipCoupons() {
     }
     const buttons = document.getElementsByTagName('button')
     for (const b of buttons) {
-        if (b.innerText == 'Clip Coupon') b.click();
+        if (b.innerText == 'Clip Coupon' || b.innerHTML == 'Activate') b.click();
     }
     console.log('Finished clipping coupons!');
 }
