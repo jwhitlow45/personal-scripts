@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Safeway Clip All Coupons Button
-// @version      0.2
+// @version      0.3
 // @description  Add convenient button to automatically load and clip all coupons on Safeway's ForU page
 // @author       jwhitlow45
 // @match        https://www.safeway.com/foru/coupons-deals.html*
