@@ -8,33 +8,37 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+  "use strict";
 
-    const couponGridContainer = document.getElementsByClassName('coupon-grid-container')[0];
+  const couponGridContainer = document.getElementsByClassName(
+    "coupon-grid-container",
+  )[0];
 
-    let clipButton = document.createElement('button');
-    clipButton.addEventListener('click', clipCoupons);
-    clipButton.innerHTML = '<span>Clip All Coupons</span>';
-    clipButton.classList.add('btn');
-    clipButton.classList.add('btn-secondary');
-    clipButton.style.width = '175px';
+  let clipButton = document.createElement("button");
+  clipButton.addEventListener("click", clipCoupons);
+  clipButton.innerHTML = "<span>Clip All Coupons</span>";
+  clipButton.classList.add("btn");
+  clipButton.classList.add("btn-secondary");
+  clipButton.style.width = "175px";
 
-    couponGridContainer.insertBefore(clipButton, couponGridContainer.firstChild);
+  couponGridContainer.insertBefore(clipButton, couponGridContainer.firstChild);
 })();
 
+const buttons_to_click = ["Clip Coupon", "Activate", "Add to List"];
+
 async function clipCoupons() {
-    console.log('Clipping coupons...');
-    let load_more = document.getElementsByClassName('load-more')[0];
-    while (load_more != undefined) {
-        load_more.click()
-        await new Promise(r => setTimeout(r, 1000));
-        window.scrollTo(0, document.body.scrollHeight);
-        load_more = document.getElementsByClassName('load-more')[0];
-    }
-    const buttons = document.getElementsByTagName('button')
-    for (const b of buttons) {
-        if (b.innerText == 'Clip Coupon' || b.innerHTML == 'Activate') b.click();
-    }
-    console.log('Finished clipping coupons!');
+  console.log("Clipping coupons...");
+  let load_more = document.getElementsByClassName("load-more")[0];
+  while (load_more != undefined) {
+    load_more.click();
+    await new Promise((r) => setTimeout(r, 1000));
+    window.scrollTo(0, document.body.scrollHeight);
+    load_more = document.getElementsByClassName("load-more")[0];
+  }
+  const buttons = document.getElementsByTagName("button");
+  for (const b of buttons) {
+    if (buttons_to_click.includes(b.innerText)) b.click();
+  }
+  console.log("Finished clipping coupons!");
 }
