@@ -1,0 +1,90 @@
+## ========== Git branch UI ==========
+# Load version control information
+autoload -Uz vcs_info
+precmd() { vcs_info }
+# Format the vcs_info_msg_0_ variable
+zstyle ':vcs_info:git:*' formats $'%F{227}\U2387'" %b%f"
+# Set up prompt
+setopt promptsubst
+
+## ========== Custom color prompt stuff ==========
+PROMPT=$'\n''%f%F{250}[%~]'$'\n''[%D{%H:%M:%S}] %F{140}%n@local%f%F{45}:$%f '
+RPROMPT=\$vcs_info_msg_0_
+
+## ========== Folder shortcuts ==========
+alias repos='cd populate/with/path/to/repos'
+
+## ========== cmd Aliases ==========
+alias ccd='clear && cd'		# Clear terminal and return home
+alias ls='ls -G --color=auto'
+
+# Docker stuff
+alias dcup="docker compose up -d"
+
+execr() { # execute a command in all of the current directory's child directories
+    for d in */ ; do
+        # Enter current directory
+        cd $d
+        echo "Executing command [$@] in [$d]"
+        echo "=============================="
+	      # Execute custom command
+        eval "$@"
+        echo ""
+        # Exit to initial directory
+        cd ..
+    done
+}
+
+prclean() { # pull latest master and clean up merged branch
+
+  if [ $# -eq 0 ]
+  then
+    current_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+  else
+    current_branch=$1
+  fi
+
+  if [ "$current_branch" = "master" ] || [ "$current_branch" = "main" ]; then
+    echo "Cannot use on ${current_branch} branch!"
+    return
+  fi
+
+  git checkout master &> /dev/null || git checkout main &> /dev/null
+  primary_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+  echo "Switched to branch '$primary_branch'"
+
+  git pull
+  git fetch --prune
+  git branch -D $current_branch
+}
+
+grepr() { # (search_regex, file_name_regex) recursively grep from current folder
+  grep $1 -R . --include \*$2
+}
+
+mkcd() { # create directory and cd into it
+  mkdir -p $1 && cd $1
+}
+
+SLACK_NOTIFIER_WEBHOOK="populate.your.slack.webhook.url.here"
+SLACK_NOTIFIER_DEFAULT_MESSAGE=":party-parrot: Command finished execution! :party-parrot:"
+notify() { # (optional(message)) send slack notification
+    if [ ! -z "$1" ]
+        then
+        JSON_FORMAT='{"message":"%s"}'
+        MESSAGE="${1}"
+        JSON_STRING=$(printf "$JSON_FORMAT" "$MESSAGE")
+        curl -sS -X POST $SLACK_NOTIFIER_WEBHOOK -H "Content-Type:application/json" --data "$JSON_STRING" > /dev/null
+        return
+    fi
+    curl -sS -X POST $SLACK_NOTIFIER_WEBHOOK -H "Content-Type:application/json" --data "{\"message\":\"${SLACK_NOTIFIER_DEFAULT_MESSAGE}\"}" > /dev/null
+}
+
+rfa() { # "Run for all". Run a command for all arguments passed
+  for arg in "${@:2}"; do
+    echo "Running command: $1 $arg"
+    echo "=============================="
+    $1 "$arg"
+    echo ""
+  done
+}
