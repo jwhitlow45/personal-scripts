@@ -54,11 +54,11 @@ for (const route of ROUTES) {
     const columns = [
       `${styleText('blue', 'BART')} ${styleText('bold', clock(train))}`,
       styleText('dim', `(${minutesBetween(now, train)} min)`.padEnd(8)),
-      `${styleText('dim', 'arrives')} ${styleText('bold', clock(arrival))}`,
-      `${styleText('magenta', `${route.line} at`)} ${styleText('bold', clock(bus.time))}`,
+      '->',
+      `${styleText('magenta', route.line)} ${styleText('bold', clock(bus.time))}`,
       `${styleText('green', `(${minutesBetween(arrival, bus.time)} min transfer,`.padEnd(17))} ${styleText('yellow', `${describeDelay(bus.delay)})`)}`,
     ];
-    console.log(`  ${columns.join('  ')}`);
+    console.log(`  ${columns.join(' ')}`);
   }
 }
 
@@ -115,7 +115,7 @@ async function fetchTrips(url: string): Promise<Trip[]> {
 function describeDelay(seconds: StopTime['delay']) {
   if (seconds == null) return 'delay unknown';
   const minutes = Math.round(seconds / 60);
-  return minutes < 0 ? `${-minutes} min early` : `${minutes} min delayed`;
+  return minutes < 0 ? `${-minutes} min early` : `${minutes} min late`;
 }
 
 function minutesBetween(from: number, to: number) {
