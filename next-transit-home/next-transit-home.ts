@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { styleText } from 'node:util';
 
-const MIN_TRANSFER_MINUTES = 4;
+const MIN_TRANSFER_MINUTES = 3;
 const TRAINS_PER_ROUTE = 3;
 
 // 511 stop codes. Platform 1 is the southbound platform at each BART station.
@@ -44,14 +44,18 @@ const plans = await Promise.all(
 );
 
 for (const { route, connections } of plans) {
-  console.log(styleText('bold', `\nMontgomery → ${route.bartStation} → ${route.line}`));
-  if (connections.length === 0) console.log('  No connection in the current predictions');
+  console.log(styleText(['bold', 'cyan'], `\nMontgomery → ${route.bartStation} → ${route.line}`));
+  if (connections.length === 0) console.log(styleText('yellow', '  No connection in the current predictions'));
   for (const { train, arrival, bus } of connections) {
-    console.log(
-      `  BART ${clock(train)} (in ${minutesBetween(now, train)} min)` +
-        `  arrives ${clock(arrival)}` +
-        `  ${route.line} at ${clock(bus)} (${minutesBetween(arrival, bus)} min to transfer)`,
-    );
+    // Columns are padded before coloring so rows line up across both routes.
+    const columns = [
+      `${styleText('blue', 'BART')} ${styleText('bold', clock(train))}`,
+      styleText('dim', `(${minutesBetween(now, train)} min)`.padEnd(8)),
+      `${styleText('dim', 'arrives')} ${styleText('bold', clock(arrival))}`,
+      `${styleText('magenta', `${route.line} at`)} ${styleText('bold', clock(bus))}`,
+      styleText('green', `(${minutesBetween(arrival, bus)} min to transfer)`),
+    ];
+    console.log(`  ${columns.join('  ')}`);
   }
 }
 
@@ -95,5 +99,5 @@ function minutesBetween(from: number, to: number) {
 }
 
 function clock(time: number) {
-  return new Date(time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).padStart(8);
 }
