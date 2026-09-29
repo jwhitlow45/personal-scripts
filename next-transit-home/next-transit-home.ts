@@ -5,6 +5,7 @@
 // Times come from GTFS-realtime trip updates: BART's own feed, which needs no key, and 511's
 // Muni feed. These reach further ahead than 511's per-stop API, which returns only the next
 // 3 buses per line. Each run makes one 511 request, and a 511 key allows 60 per hour.
+// An optional HOME_STOP_CODE adds when each bus reaches that stop.
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,7 +31,7 @@ type Trip = { routeId?: string | null; stopTimes: Map<string, StopTime> };
 
 const ENV_FILE = join(import.meta.dirname, '.env');
 if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
-const { API_KEY_511 } = process.env;
+const { API_KEY_511, HOME_STOP_CODE } = process.env;
 if (!API_KEY_511) {
   console.error(`Set API_KEY_511 in ${ENV_FILE}. Get a key at https://511.org/open-data/token`);
   process.exit(1);
@@ -57,8 +58,9 @@ for (const route of ROUTES) {
       styleText('dim', `(${minutesBetween(now, train)} min)`.padEnd(8)),
       '→',
       `${styleText('magenta', route.line)} ${styleText('bold', clock(bus.time))}`,
-      `${styleText('green', `(${minutesBetween(arrival, bus.time)} min transfer,`.padEnd(17))} ${styleText('yellow', `${describeDelay(bus.delay)})`)}`,
+      `${styleText('green', `(${minutesBetween(arrival, bus.time)} min transfer,`.padEnd(17))} ${styleText('yellow', `${describeDelay(bus.delay)})`.padEnd(14))}`,
     ];
+    if (bus.homeArrival !== undefined) columns.push(`→ ${styleText('cyan', 'Home')} ${styleText('bold', clock(bus.homeArrival))}`);
     console.log(`  ${columns.join(' ')}`);
   }
 }
@@ -69,7 +71,13 @@ function findConnections(route: (typeof ROUTES)[number], bartTrips: Trip[], muni
   // Other lines share these stops, such as the 27 at 8th St & Market St.
   const buses = muniTrips
     .filter(({ routeId }) => routeId === route.line)
-    .flatMap(({ stopTimes }) => stopTimes.get(route.muniStopId) ?? [])
+    .flatMap(({ stopTimes }) => {
+      const bus = stopTimes.get(route.muniStopId);
+      if (!bus) return [];
+      const home = HOME_STOP_CODE ? stopTimes.get(HOME_STOP_CODE)?.time : undefined;
+      // A home stop the bus reaches before the boarding stop is on this trip, but not on the way home.
+      return [{ ...bus, homeArrival: home !== undefined && home > bus.time ? home : undefined }];
+    })
     .sort((a, b) => a.time - b.time);
   const connections = bartTrips.flatMap(({ stopTimes }) => {
     const train = stopTimes.get(MONTGOMERY_SOUTHBOUND)?.time;
