@@ -1,0 +1,8 @@
+{
+  "name": "next-transit-home",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "gtfs-realtime-bindings": "^2.2.0"
+  }
+}
