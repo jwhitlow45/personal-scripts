@@ -55,7 +55,7 @@ for (const route of ROUTES) {
     const columns = [
       `${styleText('blue', 'BART')} ${styleText('bold', clock(train))}`,
       styleText('dim', `(${minutesBetween(now, train)} min)`.padEnd(8)),
-      '->',
+      '→',
       `${styleText('magenta', route.line)} ${styleText('bold', clock(bus.time))}`,
       `${styleText('green', `(${minutesBetween(arrival, bus.time)} min transfer,`.padEnd(17))} ${styleText('yellow', `${describeDelay(bus.delay)})`)}`,
     ];
