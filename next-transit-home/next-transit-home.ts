@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // For the next few Muni buses home, lists every southbound BART train from Montgomery that
-// connects to each one, counting only transfers of MIN_TRANSFER_MINUTES to MAX_TRANSFER_MINUTES
-// between the train arriving and the bus arriving.
+// connects to each one, counting only trains at least MIN_MINUTES_UNTIL_TRAIN away and transfers
+// of MIN_TRANSFER_MINUTES to MAX_TRANSFER_MINUTES between the train arriving and the bus arriving.
 // Times come from GTFS-realtime trip updates: BART's own feed, which needs no key, and 511's
 // Muni feed. These reach further ahead than 511's per-stop API, which returns only the next
 // 3 buses per line. Each run makes one 511 request, and a 511 key allows 60 per hour.
@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { styleText } from 'node:util';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
+const MIN_MINUTES_UNTIL_TRAIN = 3;
 const MIN_TRANSFER_MINUTES = 3;
 const MAX_TRANSFER_MINUTES = 12;
 const BUSES_PER_ROUTE = 2;
@@ -73,7 +74,8 @@ function findConnections(route: (typeof ROUTES)[number], bartTrips: Trip[], muni
   const connections = bartTrips.flatMap(({ stopTimes }) => {
     const train = stopTimes.get(MONTGOMERY_SOUTHBOUND)?.time;
     const arrival = stopTimes.get(route.bartStopId)?.time;
-    if (train === undefined || arrival === undefined || train <= now) return [];
+    if (train === undefined || arrival === undefined) return [];
+    if (minutesBetween(now, train) < MIN_MINUTES_UNTIL_TRAIN) return [];
     const bus = buses.find(({ time }) => minutesBetween(arrival, time) >= MIN_TRANSFER_MINUTES);
     const isShortTransfer = bus !== undefined && minutesBetween(arrival, bus.time) <= MAX_TRANSFER_MINUTES;
     return isShortTransfer ? [{ train, arrival, bus }] : [];
