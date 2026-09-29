@@ -1,0 +1,95 @@
+/* userChrome.css */
+/* The expand-on-hover delay and animation speed are prefs, not CSS:
+   sidebar.animation.expand-on-hover.delay-duration-ms and
+   sidebar.animation.expand-on-hover.duration-ms in about:config. */
+
+/* Vertical tabs sit almost flush, 1px apart instead of 9px. These are Firefox's own
+   spacing variables, which tab group labels also use, so the rows stay aligned. */
+#tabbrowser-tabs[orient="vertical"] {
+  --tab-padding-block-start: 1px !important;
+  --tab-padding-block-end: 0px !important;
+  --tab-margin-block: 0px !important;
+}
+
+/* Narrower collapsed column: 4px beside each 32px tab and launcher button instead of
+   about 8px, so the column is 40px wide instead of 49px. These are set on :root
+   because Firefox derives the collapsed tab width from them there. */
+@media -moz-pref("sidebar.verticalTabs") {
+  :root {
+    --tab-inner-inline-margin: 4px !important;
+    --sidebar-launcher-button-padding-inline: 4px !important;
+  }
+}
+
+/* Larger tab icons in the same 32px tab rows. Firefox sizes the icon stack at a fixed
+   16px and centers it from --icon-size, so both are replaced here. */
+#tabbrowser-tabs[orient="vertical"] {
+  --vertical-tab-icon-size: var(--icon-size-medium);
+  --tab-inline-padding: calc((var(--tab-collapsed-width) - var(--vertical-tab-icon-size)) / 2) !important;
+
+  :is(.tab-throbber, .tab-icon-pending, .tab-icon-image, .tab-sharing-icon-overlay, .tab-icon-overlay) {
+    width: var(--vertical-tab-icon-size) !important;
+    height: var(--vertical-tab-icon-size) !important;
+  }
+}
+
+/* Purple theme matched to the lighter wave in the new tab wallpaper: the wave's #4B187E
+   for the toolbars and tab column, a lighter purple for the selected tab, and the
+   wallpaper's darker purples for the address bar and menus. It sets the same variables a
+   Firefox theme add-on would, because release Firefox only installs signed add-ons for
+   good. No surface is white, and text on every surface keeps at least 4.5:1 contrast. The
+   dark color scheme keeps anything left unset on Firefox's dark defaults. */
+:root {
+  --custom-theme-frame: #4B187E;
+  --custom-theme-selected: #6531A3;
+  --custom-theme-field: #2E0A54;
+  --custom-theme-dark: #20043F;
+  --custom-theme-text: #F3EEFC;
+  --custom-theme-field-text: #EDE6FA;
+  --custom-theme-placeholder: #C9B8EC;
+  --custom-theme-accent: #B89CFF;
+
+  color-scheme: dark !important;
+
+  --toolbox-background-color: var(--custom-theme-frame) !important;
+  --toolbox-background-color-inactive: var(--custom-theme-frame) !important;
+  --toolbox-text-color: var(--custom-theme-text) !important;
+  --toolbox-text-color-inactive: var(--custom-theme-text) !important;
+
+  --toolbar-background-color: var(--custom-theme-frame) !important;
+  --toolbar-text-color: var(--custom-theme-text) !important;
+  --toolbarbutton-icon-fill: var(--custom-theme-text) !important;
+  --toolbarbutton-icon-fill-attention: var(--custom-theme-accent) !important;
+
+  --tab-background-color-selected: var(--custom-theme-selected) !important;
+  --tab-selected-textcolor: var(--custom-theme-text) !important;
+
+  --toolbar-field-background-color: var(--custom-theme-field) !important;
+  --toolbar-field-text-color: var(--custom-theme-field-text) !important;
+  --toolbar-field-border-color: transparent !important;
+  --toolbar-field-background-color-focus: var(--custom-theme-dark) !important;
+  --toolbar-field-text-color-focus: var(--custom-theme-field-text) !important;
+  --toolbar-field-border-color-focus: var(--custom-theme-accent) !important;
+  --urlbar-box-background-color: color-mix(in srgb, currentColor 16%, transparent) !important;
+  --urlbarview-background-color-selected: var(--custom-theme-selected) !important;
+  --urlbarview-text-color-selected: var(--custom-theme-text) !important;
+
+  --panel-background-color: var(--custom-theme-field) !important;
+  --panel-text-color: var(--custom-theme-field-text) !important;
+  --panel-border-color: var(--custom-theme-selected) !important;
+  --background-color-box: var(--custom-theme-field) !important;
+  --input-text-background-color: var(--custom-theme-dark) !important;
+
+  --sidebar-background-color: var(--custom-theme-field) !important;
+  --sidebar-text-color: var(--custom-theme-field-text) !important;
+  --sidebar-border-color: var(--custom-theme-selected) !important;
+  --chrome-content-separator-color: var(--custom-theme-dark) !important;
+
+  --color-accent-primary: var(--custom-theme-accent) !important;
+  --focus-outline-color: var(--custom-theme-accent) !important;
+}
+
+/* The default placeholder is 54% of the text color, under 5:1 on the address bar. */
+#urlbar-input::placeholder {
+  color: var(--custom-theme-placeholder) !important;
+}

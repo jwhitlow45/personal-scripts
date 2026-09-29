@@ -1,0 +1,28 @@
+/* userContent.css */
+
+@-moz-document url("about:newtab"), url("about:home") {
+  /* The search box, in the lighter wave purple from userChrome.css so it stands out on the
+     dark wallpaper. Without this it stays white, because the new tab page follows the
+     light color scheme and the wallpaper only changes the text color around it. */
+  content-search-handoff-ui {
+    --content-search-handoff-ui-background-color: #4B187E !important;
+    --content-search-handoff-ui-color: #EDE6FA !important;
+    --content-search-handoff-ui-fill: #EDE6FA !important;
+    --content-search-handoff-ui-caret-color: #EDE6FA !important;
+    --content-search-handoff-ui-fakefocus-border-color: #B89CFF !important;
+    --content-search-handoff-ui-fakefocus-box-shadow-inner: color-mix(in srgb, #B89CFF 25%, transparent) !important;
+  }
+
+  /* The placeholder is drawn at 54% opacity, under 4.5:1 on purple. */
+  .fake-textbox {
+    opacity: 1 !important;
+    color: #C9B8EC !important;
+  }
+
+  /* A wallpaper wider than the window is scaled to the window's height, and scaling blends
+     its top and bottom pixel rows with the page color behind it. The light page color made
+     a white line along both edges, so dark wallpapers get a dark page color. */
+  body.darkWallpaper {
+    background-color: #20043F !important;
+  }
+}
