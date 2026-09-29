@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Lists the next southbound BART trains from Montgomery that connect to a Muni bus home,
-// leaving at least MIN_TRANSFER_MINUTES between the train arriving and the bus arriving.
+// For the next few Muni buses home, lists every southbound BART train from Montgomery that
+// connects to each one, counting only transfers of MIN_TRANSFER_MINUTES to MAX_TRANSFER_MINUTES
+// between the train arriving and the bus arriving.
 // Times come from GTFS-realtime trip updates: BART's own feed, which needs no key, and 511's
 // Muni feed. These reach further ahead than 511's per-stop API, which returns only the next
 // 3 buses per line. Each run makes one 511 request, and a 511 key allows 60 per hour.
@@ -11,7 +12,8 @@ import { styleText } from 'node:util';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 const MIN_TRANSFER_MINUTES = 3;
-const TRAINS_PER_ROUTE = 3;
+const MAX_TRANSFER_MINUTES = 10;
+const BUSES_PER_ROUTE = 2;
 
 // Stop ids as each feed names them. Platform 1 is the southbound platform at each BART station,
 // and 511 names Muni stops by their stop code.
@@ -40,8 +42,12 @@ const [bartTrips, muniTrips] = await Promise.all([
 for (const route of ROUTES) {
   const connections = findConnections(route, bartTrips, muniTrips);
   console.log(styleText(['bold', 'cyan'], `\nMontgomery → ${route.bartStation} → ${route.line}`));
-  if (connections.length === 0) console.log(styleText('yellow', '  No connection in the current predictions'));
-  for (const { train, arrival, bus } of connections) {
+  if (connections.length === 0) {
+    const transfer = `${MIN_TRANSFER_MINUTES} to ${MAX_TRANSFER_MINUTES} minute transfer`;
+    console.log(styleText('yellow', `  No connection with a ${transfer} in the current predictions`));
+  }
+  for (const [index, { train, arrival, bus }] of connections.entries()) {
+    if (index > 0 && bus !== connections[index - 1].bus) console.log();
     // Columns are padded before coloring so rows line up across both routes.
     const columns = [
       `${styleText('blue', 'BART')} ${styleText('bold', clock(train))}`,
@@ -54,23 +60,26 @@ for (const route of ROUTES) {
   }
 }
 
-// Pairs each upcoming train with the first bus that leaves enough time to transfer.
+// Pairs each upcoming train with the first bus that leaves enough time to transfer, drops
+// transfers that are too long, and keeps the trains for the first BUSES_PER_ROUTE buses.
 function findConnections(route: (typeof ROUTES)[number], bartTrips: Trip[], muniTrips: Trip[]) {
   // Other lines share these stops, such as the 27 at 8th St & Market St.
   const buses = muniTrips
     .filter(({ routeId }) => routeId === route.line)
     .flatMap(({ stopTimes }) => stopTimes.get(route.muniStopId) ?? [])
     .sort((a, b) => a - b);
-  return bartTrips
-    .flatMap(({ stopTimes }) => {
-      const train = stopTimes.get(MONTGOMERY_SOUTHBOUND);
-      const arrival = stopTimes.get(route.bartStopId);
-      if (train === undefined || arrival === undefined || train <= now) return [];
-      const bus = buses.find((time) => minutesBetween(arrival, time) >= MIN_TRANSFER_MINUTES);
-      return bus === undefined ? [] : [{ train, arrival, bus }];
-    })
-    .sort((a, b) => a.train - b.train)
-    .slice(0, TRAINS_PER_ROUTE);
+  const connections = bartTrips.flatMap(({ stopTimes }) => {
+    const train = stopTimes.get(MONTGOMERY_SOUTHBOUND);
+    const arrival = stopTimes.get(route.bartStopId);
+    if (train === undefined || arrival === undefined || train <= now) return [];
+    const bus = buses.find((time) => minutesBetween(arrival, time) >= MIN_TRANSFER_MINUTES);
+    const isShortTransfer = bus !== undefined && minutesBetween(arrival, bus) <= MAX_TRANSFER_MINUTES;
+    return isShortTransfer ? [{ train, arrival, bus }] : [];
+  });
+  const shownBuses = [...new Set(connections.map(({ bus }) => bus))].sort((a, b) => a - b).slice(0, BUSES_PER_ROUTE);
+  return connections
+    .filter(({ bus }) => shownBuses.includes(bus))
+    .sort((a, b) => a.bus - b.bus || a.train - b.train);
 }
 
 // Maps each trip in a GTFS-realtime feed to its predicted time at each stop,
