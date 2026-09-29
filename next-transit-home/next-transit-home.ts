@@ -23,7 +23,9 @@ const ROUTES = [
   { bartStation: 'Civic Center', bartStopId: 'M40-1', line: '19', muniStopId: '13209' }, // 8th St & Market St
 ];
 
-type Trip = { routeId?: string | null; stopTimes: Map<string, number> };
+// Delay is in seconds, and absent when the feed does not send one.
+type StopTime = { time: number; delay?: number | null };
+type Trip = { routeId?: string | null; stopTimes: Map<string, StopTime> };
 
 const ENV_FILE = join(import.meta.dirname, '.env');
 if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
@@ -53,8 +55,8 @@ for (const route of ROUTES) {
       `${styleText('blue', 'BART')} ${styleText('bold', clock(train))}`,
       styleText('dim', `(${minutesBetween(now, train)} min)`.padEnd(8)),
       `${styleText('dim', 'arrives')} ${styleText('bold', clock(arrival))}`,
-      `${styleText('magenta', `${route.line} at`)} ${styleText('bold', clock(bus))}`,
-      styleText('green', `(${minutesBetween(arrival, bus)} min to transfer)`),
+      `${styleText('magenta', `${route.line} at`)} ${styleText('bold', clock(bus.time))}`,
+      `${styleText('green', `(${minutesBetween(arrival, bus.time)} min transfer,`.padEnd(17))} ${styleText('yellow', `${describeDelay(bus.delay)})`)}`,
     ];
     console.log(`  ${columns.join('  ')}`);
   }
@@ -67,19 +69,21 @@ function findConnections(route: (typeof ROUTES)[number], bartTrips: Trip[], muni
   const buses = muniTrips
     .filter(({ routeId }) => routeId === route.line)
     .flatMap(({ stopTimes }) => stopTimes.get(route.muniStopId) ?? [])
-    .sort((a, b) => a - b);
+    .sort((a, b) => a.time - b.time);
   const connections = bartTrips.flatMap(({ stopTimes }) => {
-    const train = stopTimes.get(MONTGOMERY_SOUTHBOUND);
-    const arrival = stopTimes.get(route.bartStopId);
+    const train = stopTimes.get(MONTGOMERY_SOUTHBOUND)?.time;
+    const arrival = stopTimes.get(route.bartStopId)?.time;
     if (train === undefined || arrival === undefined || train <= now) return [];
-    const bus = buses.find((time) => minutesBetween(arrival, time) >= MIN_TRANSFER_MINUTES);
-    const isShortTransfer = bus !== undefined && minutesBetween(arrival, bus) <= MAX_TRANSFER_MINUTES;
+    const bus = buses.find(({ time }) => minutesBetween(arrival, time) >= MIN_TRANSFER_MINUTES);
+    const isShortTransfer = bus !== undefined && minutesBetween(arrival, bus.time) <= MAX_TRANSFER_MINUTES;
     return isShortTransfer ? [{ train, arrival, bus }] : [];
   });
-  const shownBuses = [...new Set(connections.map(({ bus }) => bus))].sort((a, b) => a - b).slice(0, BUSES_PER_ROUTE);
+  const shownBuses = [...new Set(connections.map(({ bus }) => bus))]
+    .sort((a, b) => a.time - b.time)
+    .slice(0, BUSES_PER_ROUTE);
   return connections
     .filter(({ bus }) => shownBuses.includes(bus))
-    .sort((a, b) => a.bus - b.bus || a.train - b.train);
+    .sort((a, b) => a.bus.time - b.bus.time || a.train - b.train);
 }
 
 // Maps each trip in a GTFS-realtime feed to its predicted time at each stop,
@@ -95,13 +99,23 @@ async function fetchTrips(url: string): Promise<Trip[]> {
   return feed.entity.flatMap(({ tripUpdate }) => {
     if (!tripUpdate || tripUpdate.trip.scheduleRelationship === TripDescriptor.ScheduleRelationship.CANCELED) return [];
     const stopTimes = (tripUpdate.stopTimeUpdate ?? []).flatMap(({ stopId, arrival, departure, scheduleRelationship }) => {
-      // Times are unix seconds held as 64-bit values, and an absent time decodes as zero.
-      const time = Number(arrival?.time) || Number(departure?.time);
+      // Times are unix seconds held as 64-bit values. Absent fields decode as zero,
+      // so the delay counts only when the feed sent one.
+      const event = Number(arrival?.time) ? arrival : departure;
+      const time = Number(event?.time);
       const isStopping = scheduleRelationship !== TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED;
-      return stopId && time && isStopping ? [[stopId, time * 1000] as const] : [];
+      if (!stopId || !event || !time || !isStopping) return [];
+      const delay = Object.hasOwn(event, 'delay') ? event.delay : undefined;
+      return [[stopId, { time: time * 1000, delay }] as const];
     });
     return [{ routeId: tripUpdate.trip.routeId, stopTimes: new Map(stopTimes) }];
   });
+}
+
+function describeDelay(seconds: StopTime['delay']) {
+  if (seconds == null) return 'delay unknown';
+  const minutes = Math.round(seconds / 60);
+  return minutes < 0 ? `${-minutes} min early` : `${minutes} min delayed`;
 }
 
 function minutesBetween(from: number, to: number) {
