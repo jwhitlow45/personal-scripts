@@ -15,7 +15,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 const MIN_MINUTES_UNTIL_TRAIN = 3;
 const MIN_TRANSFER_MINUTES = 3;
 const MAX_TRANSFER_MINUTES = 12;
-const BUSES_PER_ROUTE = 2;
+const BUSES_PER_ROUTE = 3;
 
 // Stop ids as each feed names them. Platform 1 is the southbound platform at each BART station,
 // and 511 names Muni stops by their stop code.
