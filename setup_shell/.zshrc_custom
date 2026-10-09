@@ -1,62 +1,309 @@
-## ========== Git branch UI ==========
-# Load version control information
-autoload -Uz vcs_info
-precmd() { vcs_info }
-# Format the vcs_info_msg_0_ variable
-zstyle ':vcs_info:git:*' formats $'%F{227}\U2387'" %b%f"
-# Set up prompt
+## == AWS ==
+export AWS_PROFILE=alcove-developer
+
+## == Custom git branch autocomplete =
+__git_branch_auto_complete() {
+    compadd "${(@)${(f)$(git branch -a)}#??}"
+}
+
+# JJ prompt info (nearest bookmark + commits ahead + workspace)
+_jj_prompt_info() {
+  # Get nearest ancestor bookmark — use change_id for safe revset usage,
+  # bookmarks for display (handles multiple bookmarks on same commit)
+  local info
+  # Prefer local bookmarks. "*" means origin does not have this bookmark at this commit (never pushed, or moved since).
+  # Not synced(): that also compares against the @git pseudo-remote, which only the colocated default workspace
+  # keeps current, so it shows a false "*" in added workspaces.
+  # Fall back to remote_bookmarks() for remote-only case (e.g. main@origin with no local main).
+  info=$(jj log --no-graph --ignore-working-copy \
+    -r 'latest(::@ & bookmarks())' \
+    --template 'change_id ++ "|" ++ local_bookmarks.map(|b| b.name() ++ if(remote_bookmarks.filter(|r| r.remote() == "origin" && r.name() == b.name()), "", "*")).join(" ")' \
+    2>/dev/null)
+  if [[ -z "$info" ]]; then
+    info=$(jj log --no-graph --ignore-working-copy \
+      -r 'latest(::@ & remote_bookmarks(remote=origin))' \
+      --template 'change_id ++ "|" ++ remote_bookmarks.filter(|b| b.remote() == "origin").map(|b| b.name() ++ "@origin").join(" ")' \
+      2>/dev/null)
+  fi
+  [[ -z "$info" ]] && return 1
+  local bmark_id="${info%%|*}"
+  local bookmark="${info#*|}"
+  [[ -z "$bookmark" ]] && return 1
+
+  local ahead
+  ahead=$(jj log --no-graph --ignore-working-copy \
+    -r "${bmark_id}..@" \
+    --template '"x\n"' 2>/dev/null | wc -l | tr -d ' ')
+
+  # Current workspace: the workspace(s) whose working-copy commit is @.
+  # Normally exactly one. Shows several only if two workspaces were edited onto the same commit.
+  local workspace
+  workspace=$(jj log --no-graph --ignore-working-copy \
+    -r '@' \
+    --template 'working_copies.map(|w| w.name()).join(" ")' \
+    2>/dev/null)
+
+  local yellow=$'%{\e[38;5;227m%}'
+  local dim=$'%{\e[38;5;243m%}'
+  local reset=$'%{\e[0m%}'
+  local out=""
+  [[ -n "$workspace" ]] && out+="${dim}[${workspace}] "
+  out+="${yellow}"$'\u2387 '"${bookmark}"
+
+  if [[ $ahead -gt 0 ]]; then
+    # Ambiguous if any parent of @ lies outside the bookmark's descendant lineage (merge from foreign branch)
+    local stray
+    stray=$(jj log --no-graph --ignore-working-copy \
+      -r "parents(@) ~ ${bmark_id}::" \
+      --template '"x\n"' 2>/dev/null | wc -l | tr -d ' ')
+    if [[ $stray -gt 0 ]]; then
+      out+=" ${dim}<many>"
+    else
+      out+=" ${dim}+${ahead}"
+    fi
+  fi
+
+  out+="${reset}"
+  echo "$out"
+}
+
+precmd() {
+  JJ_PROMPT=$(_jj_prompt_info)
+}
 setopt promptsubst
+
+# ## ========== Git branch UI ==========
+# # Load version control information
+# autoload -Uz vcs_info
+# precmd() { vcs_info }
+# # Format the vcs_info_msg_0_ variable
+# zstyle ':vcs_info:jj:*' formats $'%F{227}\U2387'" %b%f"
+# # Set up prompt
+# setopt promptsubst
 
 ## ========== Custom color prompt stuff ==========
 PROMPT=$'\n''%f%F{250}[%~]'$'\n''[%D{%H:%M:%S}] %F{140}%n@local%f%F{45}:$%f '
-RPROMPT=\$vcs_info_msg_0_
+RPROMPT=\$JJ_PROMPT
 
 ## ========== Folder shortcuts ==========
-alias repos='cd populate/with/path/to/repos'
+alias repos='cd /Users/j/repos'
+alias reposc='code /Users/j/alcove'
 
 ## ========== cmd Aliases ==========
-alias ccd='clear && cd'		# Clear terminal and return home
+alias ccd='clear && cd'		 # Clear terminal and return home
+alias food='/Users/j/personal-scripts/find_restaurant/find-restaurant.sh' # Search for restaurants near work
+alias home='/Users/j/personal-scripts/next-transit-home/next-transit-home.ts' # Next BART from Montgomery that connects to the 48 or 19 home
+alias ga='git a'		 # Force ga alias to use a alias for add with status in ~/.gitconfig
 alias ls='ls -G --color=auto'
+
+# jj (Jujutsu VCS) aliases/functions
+alias j='jj'
+## how it is
+alias jw='jj workspace'
+alias js='jj show'
+alias jst='jj status'
+alias jlg='jj log -n 15'
+alias jlog='jj log'
+jf() { # diff filenames from rev1 to rev2; if one arg, diff from it to @
+  if [[ $# -eq 1 ]]; then
+    jj diff --name-only --from "$1" --to @
+  else
+    jj diff --name-only --from "$1" --to "$2"
+  fi
+}
+jdf() { # diff from rev1 to rev2; if one arg, diff from it to @
+  if [[ $# -eq 1 ]]; then
+    jj diff --from "$1" --to @
+  else
+    jj diff --from "$1" --to "$2"
+  fi
+}
+## traversal
+alias je='jj edit'
+alias jn='jj new'
+alias ja='jj abandon'
+alias ju='jj undo'
+# what it is
+alias jd='jj describe -m'
+alias jc='jj commit -m'
+## grafting
+alias jrst='jj restore'
+alias jr='jj rebase'
+alias jsp='jj split'
+jsq() { # squash rev into rev 2; if one arg, squash @ into it
+  if [[ $# -eq 1 ]]; then
+    jj squash --from @ --into "$1"
+  else
+    jj squash --from "$1" --into "$2"
+  fi
+}
+jro() { # rebase rev onto rev 2; if one arg, rebase @ onto it
+  if [[ $# -eq 1 ]]; then
+    jj rebase -r @ -o "$1"
+  else
+    jj rebase -r "$1" -o "$2"
+  fi
+}
+jrb() { # rebase branch onto rev 2; if one arg, rebase @ branch onto it
+  if [[ $# -eq 1 ]]; then
+    jj rebase -b @ -o "$1"
+  else
+    jj rebase -b "$1" -o "$2"
+  fi
+}
+## yeet/yoink
+alias jt='jj tug'
+jp() { # push, then export. Added workspaces never auto-export to the @git refs, so jj log there keeps a stale * on pushed bookmarks
+  jj git push "$@" && jj git export
+}
+alias jl='jj git fetch'
+alias jb='jj bookmark'
+jtp() { # tug, then jp
+  jj tug && jp "$@"
+}
+# shortcuts
+function prclean() {
+  jl
+  jn main@origin
+}
+
+function wsclean() { # run inside an added jj workspace: sync off main, forget the workspace, delete its folder
+  local dir
+  dir=$(jj root) || return 1
+  # The root workspace has a .git dir and keeps .jj/repo as a directory. An added workspace has no .git, and .jj/repo is a file pointing at the shared store.
+  [[ -e "$dir/.git" ]] && { echo "error: $dir is the root workspace" >&2; return 1 }
+  [[ -f "$dir/.jj/repo" ]] || { echo "error: $dir is not an added jj workspace" >&2; return 1 }
+  # prclean first: fetch drops the merged bookmark, and the empty new commit is what `workspace forget` abandons.
+  prclean || return 1
+  jj workspace forget || return 1
+  cd "$dir/.." && rm -rf "$dir"
+}
 
 # Docker stuff
 alias dcup="docker compose up -d"
 
-execr() { # execute a command in all of the current directory's child directories
-    for d in */ ; do
-        # Enter current directory
-        cd $d
-        echo "Executing command [$@] in [$d]"
-        echo "=============================="
-	      # Execute custom command
-        eval "$@"
-        echo ""
-        # Exit to initial directory
-        cd ..
-    done
+# GitHub
+# origin remote URL for gh -R / GH_REPO. Added jj workspaces have no .git dir, so gh cannot infer the repo from cwd.
+_jj_origin_url() {
+  jj git remote list --ignore-working-copy 2>/dev/null | awk '$1 == "origin" { print $2 }'
 }
 
-prclean() { # pull latest master and clean up merged branch
+alias prs="GH_PAGER= gh pr ls -R \"\$(_jj_origin_url)\" --json headRefName,url --jq '.[] | \"\(.headRefName)\t\(.url)\"' | grep -v '^dependabot/'"
+pro() { # (pr-number) open an alcove PR in the browser, from any directory
+  local num=${1#\#}
+  [[ $num == <-> ]] || { echo "usage: pro <pr-number>" >&2; return 1; }
+  open "https://github.com/alcoverooms/alcove/pull/$num"
+}
+function jpr() {
+  local bookmark
+  bookmark=$(jj log --no-graph --ignore-working-copy \
+    -r 'latest(::@ & bookmarks())' \
+    --template 'if(local_bookmarks, local_bookmarks.map(|b| b.name()).join(" "), remote_bookmarks.map(|b| b.name()).join(" "))' 2>/dev/null)
 
-  if [ $# -eq 0 ]
-  then
-    current_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
-  else
-    current_branch=$1
-  fi
+  [[ -z "$bookmark" ]] && { echo "error: no bookmark found" >&2; return 1; }
+  [[ "$bookmark" == *" "* ]] && { echo "error: ambiguous — multiple bookmarks: $bookmark" >&2; return 1; }
+  [[ "$bookmark" == "main" ]] && { echo "error: bookmark is 'main'" >&2; return 1; }
 
-  if [ "$current_branch" = "master" ] || [ "$current_branch" = "main" ]; then
-    echo "Cannot use on ${current_branch} branch!"
+  # create the PR (no-op error if one already exists), then open whichever PR exists.
+  # gh pr view fails / returns empty when there's no PR, so open only runs when one exists.
+  # --fill still needs git log, so it does not work in added workspaces. Pass a title or answer the prompt there.
+  local repo
+  repo=$(_jj_origin_url)
+  gh pr create -R "$repo" -H "$bookmark" "$@"
+  url=$(gh pr view "$bookmark" -R "$repo" --json url -q .url 2>/dev/null)
+  [[ -n "$url" ]] && open "$url"
+}
+# stacked diffs: one PR per commit in a revset, branches <name>-0, <name>-1, ...
+alias jprs='GH_REPO="$(_jj_origin_url)" jj-stack-prs'  # (branch-name, optional(revset)) defaults to trunk()..@; -n to preview
+function dev_deploy() {
+  # .name(): the default bookmark rendering appends * or ? markers, which gh would treat as part of the ref
+  current_branch=$(jj log -r 'latest(::@ & remote_bookmarks(remote=origin))' --no-graph -T 'local_bookmarks.map(|b| b.name()).join(" ")')
+  # gh workflow run falls back to the repo default branch when --ref is empty. Never let that through.
+  [[ -z "$current_branch" ]] && { echo "error: no local bookmark on the nearest origin-pushed commit (push first?)" >&2; return 1; }
+  output=$(gh workflow run .github/workflows/alcove-api-deploy.yml -R "$(_jj_origin_url)" --ref "$current_branch" -f environment=dev 2>&1)
+  echo "$output"
+  url=$(echo "$output" | grep -oE 'https://github\.com/[^[:space:]]+/runs/[0-9]+' | head -1)
+  [[ -n "$url" ]] && open "$url"
+}
+function fe_dev_deploy() {
+  current_branch=$(jj log -r 'latest(::@ & remote_bookmarks(remote=origin))' --no-graph -T 'local_bookmarks.map(|b| b.name()).join(" ")')
+  # gh workflow run falls back to the repo default branch when --ref is empty. Never let that through.
+  [[ -z "$current_branch" ]] && { echo "error: no local bookmark on the nearest origin-pushed commit (push first?)" >&2; return 1; }
+  output=$(gh workflow run .github/workflows/alcoverooms-com-deploy.yml -R "$(_jj_origin_url)" --ref "$current_branch" -f environment=dev 2>&1)
+  echo "$output"
+  url=$(echo "$output" | grep -oE 'https://github\.com/[^[:space:]]+/runs/[0-9]+' | head -1)
+  [[ -n "$url" ]] && open "$url"
+}
+# not technically github but fits here
+function ghash() {
+  # First parent of @ is what git reports as HEAD in a colocated jj repo. Fall back to git outside jj.
+  GHASH=$(jj log --ignore-working-copy --no-graph -r @ -T 'parents.map(|c| c.commit_id()).join(" ")' 2>/dev/null)
+  GHASH=${GHASH%% *}
+  [[ -z "$GHASH" ]] && GHASH=$(git rev-parse HEAD)
+  printf "%s" "${GHASH}" | pbcopy
+  echo "Copied latest commit hash $GHASH to clipboard"
+}
+
+# Claude Code
+cs() { # (optional(session title or name)) bring a live Claude Code session's VS Code tab to the front; no args lists live sessions
+  local f pid name src id st title tag row q="${(L)*}"
+  local -a rows matches transcript fields
+  setopt localoptions nullglob
+  # Each running session writes ~/.claude/sessions/<pid>.json. Files of exited sessions can linger, so check the pid.
+  for f in ~/.claude/sessions/*.json; do
+    IFS=$'\t' read -r pid name src id st < <(jq -r '[.pid, .name, .nameSource // "", .sessionId, .status] | @tsv' "$f")
+    kill -0 "$pid" 2>/dev/null || continue
+    # The generated alcove-xx name ends in a random tag. A renamed session no longer records it.
+    tag="--"
+    [[ $src == derived ]] && tag="${name##*-}"
+    # The tab shows a title set by hand, else the generated one. Both are appended to the transcript as they change,
+    # so the last line counts. A session that never got a message has no transcript and keeps its alcove-xx name.
+    title=""
+    transcript=(~/.claude/projects/*/"$id".jsonl)
+    (( ${#transcript} )) && title=$(grep -hE '^\{"type":"(custom|ai)-title"' $transcript | jq -rs \
+      '(map(select(.type == "custom-title"))[-1].customTitle) // (map(select(.type == "ai-title"))[-1].aiTitle) // empty')
+    rows+=("${title:-$name}"$'\t'"$name"$'\t'"$id"$'\t'"$st"$'\t'"$tag")
+  done
+  rows=("${(@oi)rows}") # each row starts with its title, so this sorts by title, ignoring case
+  if [[ -z "$q" ]]; then
+    for row in $rows; do fields=("${(@ps:\t:)row}"); printf '[%s] %-48s %s\n' "$fields[5]" "$fields[1]" "$fields[4]"; done
     return
   fi
-
-  git checkout master &> /dev/null || git checkout main &> /dev/null
-  primary_branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
-  echo "Switched to branch '$primary_branch'"
-
-  git pull
-  git fetch --prune
-  git branch -D $current_branch
+  # an exact title, name, or tag wins over titles and names that only contain the argument
+  for row in $rows; do
+    fields=("${(@ps:\t:)${(L)row}}")
+    [[ $fields[1] == "$q" || $fields[2] == "$q" || $fields[5] == "$q" ]] && { matches=("$row"); break }
+    [[ $fields[1] == *"$q"* || $fields[2] == *"$q"* ]] && matches+=("$row")
+  done
+  if (( ${#matches} != 1 )); then
+    echo "cs: ${#matches} live sessions match '$*'" >&2
+    for row in $matches; do fields=("${(@ps:\t:)row}"); echo "  [$fields[5]] $fields[1]" >&2; done
+    return 1
+  fi
+  fields=("${(@ps:\t:)matches[1]}")
+  open "vscode://anthropic.claude-code/open?session=$fields[3]"
 }
+
+# Node scripting
+export SNAPVAULT_VCS=jj
+alias snapshot="pnpm -s --filter alcove-api run snapshot"
+alias s="snapshot"
+
+execr() { # execute a command in all of the current directory's child directories
+  for d in */ ; do
+    # Enter current directory
+    cd $d
+    echo "Executing command [$@] in [$d]"
+    echo "=============================="
+    # Execute custom command
+    eval "$@"
+    echo ""
+    # Exit to initial directory
+    cd ..
+  done
+}
+
+
 
 grepr() { # (search_regex, file_name_regex) recursively grep from current folder
   grep $1 -R . --include \*$2
@@ -66,18 +313,18 @@ mkcd() { # create directory and cd into it
   mkdir -p $1 && cd $1
 }
 
-SLACK_NOTIFIER_WEBHOOK="populate.your.slack.webhook.url.here"
-SLACK_NOTIFIER_DEFAULT_MESSAGE=":party-parrot: Command finished execution! :party-parrot:"
+export SLACK_NOTIFIER_WEBHOOK="populate.your.slack.webhook.url.here"
+export SLACK_NOTIFIER_DEFAULT_MESSAGE=":party_parrot: Command finished execution! :party_parrot:"
 notify() { # (optional(message)) send slack notification
-    if [ ! -z "$1" ]
-        then
-        JSON_FORMAT='{"message":"%s"}'
-        MESSAGE="${1}"
-        JSON_STRING=$(printf "$JSON_FORMAT" "$MESSAGE")
-        curl -sS -X POST $SLACK_NOTIFIER_WEBHOOK -H "Content-Type:application/json" --data "$JSON_STRING" > /dev/null
-        return
-    fi
-    curl -sS -X POST $SLACK_NOTIFIER_WEBHOOK -H "Content-Type:application/json" --data "{\"message\":\"${SLACK_NOTIFIER_DEFAULT_MESSAGE}\"}" > /dev/null
+  if [ ! -z "$1" ]
+    then
+    JSON_FORMAT='{"message":"%s"}'
+    MESSAGE="${1}"
+    JSON_STRING=$(printf "$JSON_FORMAT" "$MESSAGE")
+    curl -sS -X POST $SLACK_NOTIFIER_WEBHOOK -H "Content-Type:application/json" --data "$JSON_STRING" > /dev/null
+    return
+  fi
+  curl -sS -X POST $SLACK_NOTIFIER_WEBHOOK -H "Content-Type:application/json" --data "{\"message\":\"${SLACK_NOTIFIER_DEFAULT_MESSAGE}\"}" > /dev/null
 }
 
 rfa() { # "Run for all". Run a command for all arguments passed
@@ -88,3 +335,6 @@ rfa() { # "Run for all". Run a command for all arguments passed
     echo ""
   done
 }
+
+# avoid saving commands starting with space to history (at bottom to prevent overrides)
+setopt HIST_IGNORE_SPACE
