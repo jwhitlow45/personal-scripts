@@ -1,7 +1,6 @@
 /* userChrome.css */
-/* The expand-on-hover delay and animation speed are prefs, not CSS:
-   sidebar.animation.expand-on-hover.delay-duration-ms and
-   sidebar.animation.expand-on-hover.duration-ms in about:config. */
+/* The expand-on-hover delay and animation speed are prefs, not CSS. user.js beside
+   this file sets them. */
 
 /* Vertical tabs sit almost flush, 1px apart instead of 9px. These are Firefox's own
    spacing variables, which tab group labels also use, so the rows stay aligned. */
