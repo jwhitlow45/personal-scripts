@@ -15,16 +15,17 @@
    because Firefox derives the collapsed tab width from them there. */
 @media -moz-pref("sidebar.verticalTabs") {
   :root {
-    --tab-inner-inline-margin: 4px !important;
+    --tab-margin-inline-inner: 4px !important;
     --sidebar-launcher-button-padding-inline: 4px !important;
   }
 }
 
-/* Larger tab icons in the same 32px tab rows. Firefox sizes the icon stack at a fixed
-   16px and centers it from --icon-size, so both are replaced here. */
+/* Larger tab icons in the same 32px tab rows. Only the icon stack is resized, since
+   --icon-size also sizes Nova's small close button on collapsed tabs, so the centering
+   padding Firefox derives from --icon-size is recomputed for the bigger icons. */
 #tabbrowser-tabs[orient="vertical"] {
   --vertical-tab-icon-size: var(--icon-size-medium);
-  --tab-inline-padding: calc((var(--tab-collapsed-width) - var(--vertical-tab-icon-size)) / 2) !important;
+  --tab-padding-inline: calc((var(--tab-collapsed-width) - var(--vertical-tab-icon-size)) / 2) !important;
 
   :is(.tab-throbber, .tab-icon-pending, .tab-icon-image, .tab-sharing-icon-overlay, .tab-icon-overlay) {
     width: var(--vertical-tab-icon-size) !important;
@@ -61,7 +62,7 @@
   --toolbarbutton-icon-fill-attention: var(--custom-theme-accent) !important;
 
   --tab-background-color-selected: var(--custom-theme-selected) !important;
-  --tab-selected-textcolor: var(--custom-theme-text) !important;
+  --tab-text-color-selected: var(--custom-theme-text) !important;
 
   --toolbar-field-background-color: var(--custom-theme-field) !important;
   --toolbar-field-text-color: var(--custom-theme-field-text) !important;
